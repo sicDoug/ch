@@ -41,16 +41,14 @@ pub async fn stream(
     config:   &Config,
 ) -> Result<String, Box<dyn std::error::Error>> {
 
-    let api_key: String = config.api_key.clone().unwrap_or_else(|| {
+    let api_key = config.api_key.clone().unwrap_or_else(|| {
         env::var("OPENAI_API_KEY").expect("No OPENAI_API_KEY found")
     });
-    let payload = Payload::construct(config, messages)?;
-    // this var accumulates each delta of the response
-    let mut full_response = String::new();
 
-    // set output color by printing ansi
+    let payload = Payload::construct(config, messages)?;
+
     print!("{}", config.color.ansi());
-    println!(); // aesthetic af
+    println!();
 
     let mut stream = reqwest::Client::new()
         .post(OPENAI_API_URL)
@@ -60,8 +58,12 @@ pub async fn stream(
         .send()
         .await?;
 
+    let mut accumulated_response = String::new();
+
+    let mut incomplete_part: Option<String> = None;
+
     while let Some(chunk) = stream.chunk().await? {
-        let raw_string = String::from_utf8_lossy(&chunk);
+        let raw_string = String::from_utf8_lossy(&chunk).into_owned();
 
         if !stream.status().is_success() {
             match serde_json::from_str::<OpenAIError>(&raw_string) {
@@ -83,37 +85,44 @@ pub async fn stream(
             }
         }
 
-        // handle each line since each chunk can contain multimple objects
-        for line in raw_string.lines().filter(|line| line.starts_with(DATA_PREFIX)) {
+        for line in raw_string.lines().filter(|line| !line.is_empty()) {
+            let mut line = line.to_owned();
+
+            // prepend the incomplete object to the line
+            if let Some(part) = incomplete_part.take() {
+                line = part + &line;
+            }
+
             // chop off data prefix before json parsing
-            let line = &line[DATA_PREFIX.len()..];
+            if let Some(l) = line.strip_prefix(DATA_PREFIX) {
+                line = l.to_string();
+            }
 
             if line.starts_with(DONE_MARKER) {
                 print!("{}", NoColor.ansi());
-                println!("\n"); // double aesthetic af
+                println!("\n");
 
-                return Ok(full_response);
+                return Ok(accumulated_response);
             }
 
-            let response = serde_json::from_str::<OpenAIResponse>(line)
-                .map_err(|error| {
-                    // TODO
-                    // It seems the server very rarely responds either with
-                    // an incomplete json object, or adds a non-escaped newline.
-                    // Figure out if this can be mitigated in some way.
-                    // Does the rest of the (possibly) incomplete chunk
-                    // come in the next chunk? Test it.
-                    print!("{}", NoColor.ansi());
-                    eprintln!("Error is EOF?: {}", error.is_eof());
-                    eprintln!("\nReceived an unparsable chunk: {}", line);
-                    format!("{}", error)
-                })?;
+            match serde_json::from_str::<OpenAIResponse>(&line) {
+                Ok(res)     => {
+                    if let Some(content) = &res.choices[0].delta.content {
+                        print!("{}", content);
+                        stdout().flush()?;
 
-            if let Some(content) = &response.choices[0].delta.content {
-                print!("{}", content);
-                stdout().flush()?;
-
-                full_response.push_str(&content);
+                        accumulated_response.push_str(&content);
+                    }
+                }
+                Err(err)    => {
+                    if err.is_eof() {
+                        incomplete_part = Some(line);
+                    } else {
+                        return Err(Box::new(Error::new(
+                            ErrorKind::Other, format!("Parsing failed: {}", line)
+                        )))
+                    }
+                }
             }
         }
     }

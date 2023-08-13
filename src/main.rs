@@ -24,7 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // get empty vec instead of log if bypass specified
+    // get empty vec instead of log if bypass arg specified
     let mut messages = if args.bypass { Vec::new() } else { load_log()? };
 
     let mut config = load_config()?;
