@@ -60,6 +60,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 print!("{}", color.ansi());
                 println!("{}\n", message.content);
             }
+            print!("{}", Color::NoColor.ansi());
         }
     }
 
