@@ -12,7 +12,7 @@ pub struct Args {
     pub prompt: Vec<String>,
     /// Input file to append to message
     #[arg(short, long, value_name = "FILE")]
-    pub input: Option<PathBuf>,
+    pub input: Option<Vec<PathBuf>>,
     /// Delete chat history
     #[arg(short, long)]
     pub clear: bool,

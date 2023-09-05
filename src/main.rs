@@ -77,10 +77,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // collect vec of non-flags args to string
     let mut prompt = args.prompt.join(" ");
 
-    if let Some(path) = args.input {
-        let contents = fs::read_to_string(&path)?;
-        let file_name = path.to_str().unwrap();
-        prompt += &format!("\n\n{}\n```\n{}```", file_name, contents);
+    if let Some(paths) = args.input {
+        for path in &paths {
+            let contents = fs::read_to_string(&path)?;
+
+            if prompt.is_empty() && paths.len() == 1 { // no formatting
+                prompt = contents;
+            } else { // formatting
+                let file_name = path.to_str().unwrap();
+                prompt += &format!("\n\n{}\n```\n{}```", file_name, contents);
+            }
+        }
     }
 
     if prompt.is_empty() { return Ok(()); }

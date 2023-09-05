@@ -31,12 +31,12 @@ ch "Hello there."
 
 ### Usage
 
-The chat history is cleared with:
+The chat history can be cleared with:
 ```bash
 ch -c
 ```
 
-The settings are stored on disc and will persist until changed.
+The CLI-settings are stored on disc and will persist until changed.
 
 Change model with:
 ```bash
@@ -45,10 +45,10 @@ ch --set-model "gpt-4"
 
 All non-flag arguments will be collected to a prompt with or without quotes:
 ```bash
-ch how do I exit vim please I need help
+ch  how do I exit vim please I need help
 ```
 
-Inclue files that will be appended to the end of the message:
+Include files that will be appended to the end of the message:
 ```bash
 ch "OH GOD WHY WONT IT COMPILE" -i main.c -i lib.h
 ```
